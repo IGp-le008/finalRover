@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rover Control Interface</title>
+
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Poppins", sans-serif;
+      }
+
+      body {
+        background: #0b0e13;
+        color: #e0e0e0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+
+      header {
+        text-align: center;
+        padding: 1rem;
+        font-size: 1.8rem;
+        color: #00ffc8;
+        background: #11151b;
+        border-bottom: 1px solid #1d222b;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1rem;
+      }
+
+      section {
+        background: #11151b;
+        border-radius: 12px;
+        border: 1px solid #1e232c;
+        flex: 1 1 320px;
+        min-height: 320px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        box-shadow: 0 0 10px rgba(0, 255, 200, 0.06);
+      }
+
+      #video-section img {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #00ffc8;
+      }
+
+      /* Joystick */
+      #joystick-base {
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        background: rgba(0, 255, 200, 0.08);
+        border: 2px solid #00ffc8;
+        position: relative;
+        touch-action: none;
+      }
+
+      #joystick-knob {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: #00ffc8;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        transition: 0.05s;
+        touch-action: none;
+      }
+
+      /* Servo Control */
+      #servo-pad {
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #servo-mid-row {
+        display: flex;
+        gap: 25px;
+      }
+
+      .servo-btn {
+        background: #00ffc8;
+        color: black;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-size: 24px;
+        cursor: pointer;
+      }
+
+      #map {
+        height: 80vh;
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>Rover Control Interface</header>
+
+    <main>
+      <!-- Video -->
+      <section id="video-section">
+        <h2>Live Rover Video</h2>
+        <img src="http://100.64.163.93:9000/person_stream" />
+      </section>
+
+      <!-- Joystick -->
+      <section id="joystick-section">
+        <h2>Rover Joystick</h2>
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
+        <div id="joystick-output">x: 0, y: 0</div>
+      </section>
+
+      <!-- Servo Control -->
+      <section id="servo-section">
+        <h2>Servo Control</h2>
+        <div id="servo-pad">
+          <button class="servo-btn" onclick="servoMove('up')">▲</button>
+
+          <div id="servo-mid-row">
+            <button class="servo-btn" onclick="servoMove('left')">◀</button>
+            <button class="servo-btn" onclick="servoMove('right')">▶</button>
+          </div>
+
+          <button class="servo-btn" onclick="servoMove('down')">▼</button>
+        </div>
+      </section>
+
+      <!-- Detection Panel -->
+      <section id="details-section">
+        <h2>Detected Humans</h2>
+        <div id="details">
+          <script>
+            const personCountURL = "http://100.64.163.93:9000/person_count";
+
+            async function updateCount() {
+              try{
+                fetch ("http://100.64.163.93:9000/person_count").then(response=>response.json())
+                .then(data=>{document.getElementById("details").innerHTML = `Detected Humans: <span style="color:#00ffc8">${data.count}</span>`})
+                .catch(error=>{console.log("Error fetching count:", error); document.getElementById("details").innerHTML = `Error Detecting Count`;
+                  
+                });
+              }catch(e){
+                console.log("Error in updateCount:", e);
+                document.getElementById("details").innerHTML = `Error Detecting Count`;
+              }
+                // const response = await fetch(personCountURL);
+
+                // // 1. Check if the server actually sent a successful response (200-299)
+                // if (!response.ok)
+                //   throw new Error(`HTTP error! status: ${response.status}`);
+
+                // const data = await response.json();
+
+                // document.getElementById("details").innerHTML =
+                //   `Detected Humans: <span style="color:#00ffc8">${data.count}</span>`;
+             
+            }
+
+            // 3. Start immediately on page load
+            // updateCount(); // Update every second
+          </script>
+        </div>
+      </section>
+
+      <!-- Map -->
+      <section id="map-section">
+        <h2>GPS Tracker</h2>
+        <div id="map"></div>
+
+        <script>
+          var map = L.map("map").setView([27.695956, 85.297725], 16);
+
+          L.tileLayer(
+            "https://api.maptiler.com/maps/streets-v4/{z}/{x}/{y}.png?key=2iVeA5hEX54GRhGKs8sU",
+            {
+              attribution:
+                '<a href="https://www.maptiler.com/copyright/" target="_blank">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>',
+            },
+          ).addTo(map);
+
+          let marker = L.marker([27.695956, 85.297725]).addTo(map);
+
+          async function updateLocation() {
+            try {
+              const res = await fetch("http://100.119.95.125:8050/gps");
+              const data = await res.json();
+              marker.setLatLng([data.lat, data.lon]);
+              map.setView([data.lat, data.lon]);
+            } catch (e) {
+              // If pi is off, ignore errors
+            }
+          }
+
+          setInterval(updateLocation, 2000);
+        </script>
+      </section>
+    </main>
+
+    <script>
+      const serverURL = "http://100.119.95.125:8000";
+
+      // Missing function restored — joystick works again
+      function sendControlToRover(x, y) {
+        fetch(`${serverURL}/move?x=${x.toFixed(2)}&y=${y.toFixed(2)}`).catch(
+          (err) => console.error("Move error:", err),
+        );
+      }
+
+      function servoMove(direction) {
+        fetch(`${serverURL}/servo/${direction}`).catch((err) =>
+          console.error("Servo error:", err),
+        );
+      }
+
+      // Joystick logic
+      const base = document.getElementById("joystick-base");
+      const knob = document.getElementById("joystick-knob");
+      const output = document.getElementById("joystick-output");
+
+      window.onload = () => {
+        const baseRect = base.getBoundingClientRect();
+        const baseCenter = { x: baseRect.width / 2, y: baseRect.height / 2 };
+        const maxDistance = baseRect.width / 2 - knob.offsetWidth / 2;
+
+        let active = false;
+
+        function updateJoystick(clientX, clientY) {
+          const rect = base.getBoundingClientRect();
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+
+          const dx = x - baseCenter.x;
+          const dy = y - baseCenter.y;
+          const distance = Math.min(Math.sqrt(dx * dx + dy * dy), maxDistance);
+          const angle = Math.atan2(dy, dx);
+
+          const knobX = baseCenter.x + distance * Math.cos(angle);
+          const knobY = baseCenter.y + distance * Math.sin(angle);
+
+          knob.style.transform = `translate(${
+            knobX - baseCenter.x - knob.offsetWidth / 2
+          }px, ${knobY - baseCenter.y - knob.offsetHeight / 2}px)`;
+
+          const normalizedX = (distance / maxDistance) * Math.cos(angle);
+          const normalizedY = (distance / maxDistance) * Math.sin(angle);
+
+          const roverY = -normalizedY;
+
+          output.innerText = `x: ${normalizedX.toFixed(
+            2,
+          )}, y: ${roverY.toFixed(2)}`;
+
+          sendControlToRover(normalizedX, roverY);
+        }
+
+        function resetJoystick() {
+          knob.style.transform = "translate(-50%, -50%)";
+          output.innerText = "x: 0, y: 0";
+          sendControlToRover(0, 0);
+        }
+
+        base.addEventListener("mousedown", (e) => {
+          active = true;
+          updateJoystick(e.clientX, e.clientY);
+        });
+
+        document.addEventListener("mousemove", (e) => {
+          if (active) updateJoystick(e.clientX, e.clientY);
+        });
+
+        document.addEventListener("mouseup", () => {
+          if (active) {
+            active = false;
+            resetJoystick();
+          }
+        });
+
+        base.addEventListener(
+          "touchstart",
+          (e) => {
+            e.preventDefault();
+            active = true;
+            updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+          },
+          { passive: false },
+        );
+
+        document.addEventListener("touchmove", (e) => {
+          if (active)
+            updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+        });
+
+        document.addEventListener("touchend", () => {
+          if (active) {
+            active = false;
+            resetJoystick();
+          }
+        });
+      };
+    </script>
+  </body>
+</html>
